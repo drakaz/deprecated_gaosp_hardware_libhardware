@@ -243,6 +243,34 @@ typedef struct {
     uint32_t        reserved;
 } sensors_data_t;
 
+// musty sensors struct
+typedef struct {
+    /* sensor identifier */
+    int             sensor;
+
+    union {
+        /* x,y,z values of the given sensor */
+        sensors_vec_t   vector;
+
+        /* orientation values are in degrees */
+        sensors_vec_t   orientation;
+
+        /* acceleration values are in meter per second per second (m/s^2) */
+        sensors_vec_t   acceleration;
+
+        /* magnetic vector values are in micro-Tesla (uT) */
+        sensors_vec_t   magnetic;
+
+        /* temperature is in degrees centigrade (Celsius) */
+        float           temperature;
+
+    };
+
+    /* time is in nanosecond */
+    int64_t         time;
+
+    uint32_t        reserved;
+} sensors_data15_t;
 
 struct sensor_t;
 
@@ -339,6 +367,43 @@ struct sensors_control_device_t {
     int (*wake)(struct sensors_control_device_t *dev);
 };
 
+// musty sensors control struct
+struct sensors_control_device15_t {
+    struct hw_device_t common;
+    
+    /**
+     * Returns the fd which will be the parameter to
+     * sensors_data_device_t::open_data(). 
+     * The caller takes ownership of this fd. This is intended to be
+     * passed cross processes.
+     *
+     * @return a fd if successful, < 0 on error
+     */
+    int (*open_data_source)(struct sensors_control_device15_t *dev);
+    
+    /** Activate/deactivate one sensor.
+     *
+     * @param handle is the handle of the sensor to change.
+     * @param enabled set to 1 to enable, or 0 to disable the sensor.
+     *
+     * @return 0 on success, negative errno code otherwise
+     */
+    int (*activate)(struct sensors_control_device15_t *dev, 
+            int handle, int enabled);
+    
+    /**
+     * Set the delay between sensor events in ms
+     *
+     * @return 0 if successful, < 0 on error
+     */
+    int (*set_delay)(struct sensors_control_device15_t *dev, int32_t ms);
+
+    /**
+     * Causes sensors_data_device_t.poll() to return -EWOULDBLOCK immediately.
+     */
+    int (*wake)(struct sensors_control_device15_t *dev);
+};
+
 struct sensors_data_device_t {
     struct hw_device_t common;
 
@@ -373,6 +438,43 @@ struct sensors_data_device_t {
      */
     int (*poll)(struct sensors_data_device_t *dev, 
             sensors_data_t* data);
+};
+
+// musty sensors data struct
+struct sensors_data_device15_t {
+    struct hw_device_t common;
+
+    /**
+     * Prepare to read sensor data.
+     *
+     * This routine does NOT take ownership of the fd
+     * and must not close it. Typically this routine would
+     * use a duplicate of the fd parameter.
+     *
+     * @param fd from sensors_control_open.
+     *
+     * @return 0 if successful, < 0 on error
+     */
+    int (*data_open)(struct sensors_data_device15_t *dev, int fd);
+    
+    /**
+     * Caller has completed using the sensor data.
+     * The caller will not be blocked in sensors_data_poll
+     * when this routine is called.
+     *
+     * @return 0 if successful, < 0 on error
+     */
+    int (*data_close)(struct sensors_data_device15_t *dev);
+    
+    /**
+     * Return sensor data for one of the enabled sensors.
+     *
+     * @return sensor handle for the returned data, 0x7FFFFFFF when 
+     * sensors_control_device_t.wake() is called and -errno on error
+     *  
+     */
+    int (*poll)(struct sensors_data_device15_t *dev, 
+            sensors_data15_t* data);
 };
 
 
